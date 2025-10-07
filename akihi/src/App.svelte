@@ -1,7 +1,7 @@
 <script>
-  import Keyboard from './lib/Keyboard.svelte'
-  import QwertyKeyboard from './keyboard/QwertyKeyboard.js'
-  import HiraganaKeyboard from './keyboard/HiraganaKeyboard';
+  import Keyboard from '$/lib/KeyBoard.svelte';
+  import QwertyKeyboard from '$/keyboard/QwertyKeyboard.js';
+  import HiraganaKeyboard from '$/keyboard/HiraganaKeyboard';
   import { fly } from 'svelte/transition';
 
   const english = new QwertyKeyboard();
