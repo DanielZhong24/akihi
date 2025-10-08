@@ -4,6 +4,29 @@
   import HiraganaKeyboard from '$/keyboard/HiraganaKeyboard';
   import { fly } from 'svelte/transition';
 
+  import { onMount } from 'svelte';
+
+  let dict = {};
+  let suggestions = [];
+
+  onMount(async () => {
+    const res = await fetch(`/jmdict-eng-common-3.6.1.json`);
+    dict = await res.json();
+    console.log(dict);
+
+  });
+
+  function handleInput() {
+    if (!inputValue) {
+      suggestions = [];
+      return;
+    }
+
+    suggestions = dict.word[0];
+    console.log(suggestions);
+  }
+
+
   const english = new QwertyKeyboard();
   const japanese = new HiraganaKeyboard();
   let keyboard = english;
@@ -32,7 +55,8 @@
       }
       return;
     }
-    inputValue += key.label
+    inputValue += key.label;
+    handleInput();
   }
   
   
@@ -51,17 +75,22 @@
   function toggleKeyboard() {
     isUsingKeyboard = !isUsingKeyboard;
   }
+
 </script>
 
 <main>
   <nav>
     <div class="title">akihi - Japanese Dictionary </div>
   </nav>
-  <input bind:value={inputValue} bind:this={inputRef} readonly={isUsingKeyboard} />
+  <input bind:value={inputValue} bind:this={inputRef} on:input={handleInput} readonly={isUsingKeyboard} />
 
 
   <div class={"output"}>
-
+    <ul>
+      {#each suggestions as s}
+        <li>{s.kanji} ({s.reading}): {s.meanings}</li>
+      {/each}
+    </ul>
   </div>
 
   {#if isUsingKeyboard}
