@@ -13,7 +13,7 @@
   -moz-osx-font-smoothing: grayscale;
   --keyboard-color: #032a5b;
   --nav-color: #09273e;
-  overflow-y: hidden;
+  overflow: hidden;
 }
 
 a {
