@@ -30,7 +30,7 @@
     searchState = 'loading';
 
     try {
-      const res = await fetch(`http://localhost:3000/api/search?q=${encodeURIComponent(inputValue)}`);
+      const res = await fetch(import.meta.env.VITE_DICTIONARY+`api/search?q=${encodeURIComponent(inputValue)}`);
       const data = await res.json();
 
       suggestions = data.message

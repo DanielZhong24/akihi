@@ -4,19 +4,21 @@ import { LRUCache } from 'lru-cache';
 import { setup, readingBeginning, kanjiBeginning } from 'jmdict-simplified-node';
 
 const PORT = process.env.PORT || 3000;
+const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN;
 const app = polka();
 
 // Initialize JMDict
 const jmdictPromise = setup(
   'my-jmdict-db',                  // LevelDB path
-  './jmdict-eng-3.6.1.json', // JSON filename if DB not found
+  './jmdict-eng-3.6.1.json',       // JSON filename if DB not found
   false,                            // verbose
   false                             // omitPartial
 );
 
-// Simple LRU cache for English searches
+// LRU cache for English searches
 const cache = new LRUCache({ max: 500 });
-// Helper: format a word for frontend
+
+// Helper to format word for frontend
 function formatWordForCard(word) {
   const kanji = word.kanji?.map(k => k.text).filter(Boolean) || [];
   const kana = word.kana?.map(k => k.text).filter(Boolean) || [];
@@ -33,16 +35,33 @@ async function buildEnglishIndex() {
   if (englishIndex) return englishIndex;
 
   const { db } = await jmdictPromise;
-  const allWords = await readingBeginning(db, '', -1);
-  englishIndex = allWords;
+  englishIndex = await readingBeginning(db, '', -1); // get all words
   return englishIndex;
 }
+
+// CORS middleware
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && origin === ALLOWED_ORIGIN) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  }
+
+  if (req.method === 'OPTIONS') {
+    res.end();
+    return;
+  }
+
+  next();
+});
 
 app.get('/api/search', async (req, res) => {
   const query = (req.query.q || '').trim().toLowerCase();
   const TOP_N = 3;
 
   if (!query) {
+    res.setHeader('Content-Type', 'application/json');
     return res.end(JSON.stringify({ message: [] }));
   }
 
@@ -57,7 +76,6 @@ app.get('/api/search', async (req, res) => {
       const kanjiResults = await kanjiBeginning(db, query, 10);
       results = [...readingResults, ...kanjiResults];
     } else {
-      // Use cache for English search
       if (cache.has(query)) {
         results = cache.get(query);
       } else {
@@ -71,18 +89,17 @@ app.get('/api/search', async (req, res) => {
       }
     }
 
-    // Deduplicate by ID
+    // Deduplicate
     const seen = new Set();
-    results = results.filter(word => {
-      if (seen.has(word.id)) return false;
-      seen.add(word.id);
+    results = results.filter(w => {
+      if (seen.has(w.id)) return false;
+      seen.add(w.id);
       return true;
     });
 
-    // Limit to top N
+    // Top N after dedup
     results = results.slice(0, TOP_N);
 
-    // Format for frontend
     const cards = results.map(formatWordForCard);
 
     res.setHeader('Content-Type', 'application/json');
