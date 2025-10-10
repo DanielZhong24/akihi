@@ -42,6 +42,7 @@ async function buildEnglishIndex() {
 // CORS middleware
 app.use((req, res, next) => {
   const allowedOrigin = process.env.ALLOWED_ORIGIN;
+  console.log(allowedOrigin);
   if (allowedOrigin) {
     res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
   }
