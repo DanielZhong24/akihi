@@ -360,16 +360,18 @@ input {
 /* Responsive */
 @media screen and (max-width: 768px) {
   .header-title { font-size: 2.2rem; }
-  .theme-btn { top: 1.5rem; right: 1rem; padding: 0.25rem 0.5rem; }
+  .theme-btn { top: 1.5rem; right: 2rem; padding: 0.25rem 0.5rem; }
   .search-container { width: 95%; }
   .toggleKeyboard { display: none; }
   .output { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
   .keyboard-wrapper { padding: 0.8rem 0.5rem; }
+  input{max-width: 90%;}
 }
 
 @media screen and (max-width: 480px) {
+  .theme-btn{right: 2rem;}
   .header-title { font-size: 1.8rem; }
-  input { font-size: 0.9rem; padding: 0.8rem 1rem; }
+  input { font-size: 0.9rem; padding: 0.8rem 1rem; max-width: 80%;}
   .card { padding: 0.8rem 1rem; }
   .output { gap: 0.8rem; }
 }
