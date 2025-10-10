@@ -41,13 +41,14 @@ async function buildEnglishIndex() {
 
 // CORS middleware
 app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  if (origin && origin === ALLOWED_ORIGIN) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  const allowedOrigin = process.env.ALLOWED_ORIGIN;
+  if (allowedOrigin) {
+    res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
   }
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
+  // Handle preflight requests
   if (req.method === 'OPTIONS') {
     res.end();
     return;
@@ -55,7 +56,6 @@ app.use((req, res, next) => {
 
   next();
 });
-
 app.get('/api/search', async (req, res) => {
   const query = (req.query.q || '').trim().toLowerCase();
   const TOP_N = 3;
