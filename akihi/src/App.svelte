@@ -180,11 +180,7 @@
 </main>
 
 <style>
-
-.header-title{
-  font-size: 3rem;
-}
-/* Main theme */
+/* General Variables */
 main {
   min-height: 100vh;
   display: flex;
@@ -228,6 +224,10 @@ main:not(.dark) {
   border-bottom-right-radius: 1rem;
   box-shadow: 0 5px 15px rgba(0,0,0,0.1);
   position: relative;
+}
+
+.header-title {
+  font-size: 3rem;
 }
 
 .theme-btn {
@@ -276,7 +276,7 @@ input {
 }
 .toggleKeyboard:hover { transform: scale(1.05); }
 
-/* Cards */
+/* Output Cards */
 .output {
   width: 95%;
   display: grid;
@@ -302,18 +302,6 @@ input {
   margin-bottom: 0.3rem;
 }
 
-.loading {
-  border:none;
-  text-align: center;
-  font-style: italic;
-  color: #64748b;
-}
-.not-found {
-  text-align: center;
-  font-style: italic;
-  color: #f87171; /* red-ish for not found */
-}
-
 .pos {
   background: #e0f2fe;
   color: #0284c7;
@@ -333,7 +321,15 @@ input {
   line-height: 1.4;
 }
 
-/* Keyboard wrapper */
+/* Loading / No-results */
+.loading, .not-found {
+  text-align: center;
+  font-style: italic;
+}
+.loading { color: #64748b; }
+.not-found { color: #f87171; }
+
+/* Keyboard */
 .keyboard-wrapper {
   position: fixed;
   bottom: 0;
@@ -359,5 +355,22 @@ input {
   border: none;
   cursor: pointer;
   margin-bottom: 0.5rem;
+}
+
+/* Responsive */
+@media screen and (max-width: 768px) {
+  .header-title { font-size: 2.2rem; }
+  .theme-btn { top: 1.5rem; right: 1rem; padding: 0.25rem 0.5rem; }
+  .search-container { width: 95%; }
+  .toggleKeyboard { display: none; }
+  .output { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+  .keyboard-wrapper { padding: 0.8rem 0.5rem; }
+}
+
+@media screen and (max-width: 480px) {
+  .header-title { font-size: 1.8rem; }
+  input { font-size: 0.9rem; padding: 0.8rem 1rem; }
+  .card { padding: 0.8rem 1rem; }
+  .output { gap: 0.8rem; }
 }
 </style>
