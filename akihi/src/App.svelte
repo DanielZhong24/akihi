@@ -68,6 +68,11 @@
 
   // Handle virtual keyboard input
   function handleKeyPress(key) {
+    if (key.code === 'Enter') {
+      clearTimeout(typingTimeout);
+      searchWords();
+      return;
+    }
     if (key.code === 'Backspace') {
       const start = inputRef.selectionStart;
       const end = inputRef.selectionEnd;
