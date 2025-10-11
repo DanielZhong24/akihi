@@ -3,8 +3,8 @@
   import QwertyKeyboard from '$/keyboard/QwertyKeyboard.js';
   import HiraganaKeyboard from '$/keyboard/HiraganaKeyboard';
   import { fly } from 'svelte/transition';
-
   import * as wanakana from 'wanakana';
+
   let suggestions = [];
   let inputValue = '';
   let inputRef;
@@ -16,33 +16,28 @@
   const english = new QwertyKeyboard();
   const japanese = new HiraganaKeyboard();
   let keyboard = english;
-
   let typingTimeout;
 
-  // Fetch results from API
   async function searchWords() {
     if (!inputValue.trim()) {
       suggestions = [];
       searchState = 'idle';
       return;
     }
-
     searchState = 'loading';
 
     try {
       const res = await fetch(import.meta.env.VITE_DICTIONARY+`api/search?q=${encodeURIComponent(inputValue)}`);
       const data = await res.json();
 
-      suggestions = data.message
-        .slice(0, 10) // limit to top 10 results
-        .map(word => ({
-          id: word.id,
-          kanji: word.kanji.join(', ') || '',
-          reading: word.kana.join(', ') || '',
-          romaji: word.kana.map(k => wanakana.toRomaji(k)).join(', '), // convert kana to romaji
-          meanings: word.definitions.join(', '),
-          pos: word.pos ? word.pos.join(', ') : ''
-        }));
+      suggestions = data.message.slice(0, 10).map(word => ({
+        id: word.id,
+        kanji: word.kanji.join(', ') || '',
+        reading: word.kana.join(', ') || '',
+        romaji: word.kana.map(k => wanakana.toRomaji(k)).join(', '),
+        meanings: word.definitions.join(', '),
+        pos: word.pos ? word.pos.join(', ') : ''
+      }));
 
       searchState = suggestions.length ? 'results' : 'no-results';
     } catch (err) {
@@ -64,11 +59,7 @@
   }
 
   function handleKeyPress(key) {
-    if (key.code === 'Enter') {
-      clearTimeout(typingTimeout);
-      searchWords();
-      return;
-    }
+    if (key.code === 'Enter') { clearTimeout(typingTimeout); searchWords(); return; }
     if (key.code === 'Backspace') {
       const start = inputRef.selectionStart;
       const end = inputRef.selectionEnd;
@@ -79,11 +70,8 @@
         inputValue = inputValue.slice(0, start - 1) + inputValue.slice(start);
         setTimeout(() => inputRef.setSelectionRange(start - 1, start - 1), 0);
       }
-    } else if (key.code === 'Space') {
-      inputValue += ' ';
-    } else {
-      inputValue += key.label;
-    }
+    } else if (key.code === 'Space') { inputValue += ' '; }
+    else { inputValue += key.label; }
 
     clearTimeout(typingTimeout);
     typingTimeout = setTimeout(() => searchWords(), 300);
@@ -110,25 +98,28 @@
   }
 
   // --------------------------
-  // Speak the word using Web Speech API
+  // Mobile-friendly Speak
   // --------------------------
   function speakWord(word) {
     if (!window.speechSynthesis) return;
 
-    const text = word.reading 
-                || (Array.isArray(word.kanji) ? word.kanji.map(k => k.text).join(' ') : word.kanji)
-                || '';
+    const text = word.reading || word.kanji || '';
     if (!text) return;
 
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'ja-JP';
 
-    // Some mobile browsers need a small timeout to initialize
+    // Fallback: if no Japanese voice, use romaji in English
+    const voices = speechSynthesis.getVoices();
+    if (!voices.some(v => v.lang.startsWith('ja'))) {
+      utterance.text = word.romaji;
+      utterance.lang = 'en-US';
+    }
+
+    // Mobile-friendly: speak after a small timeout
     setTimeout(() => speechSynthesis.speak(utterance), 0);
   }
-
 </script>
-
 
 <main class={darkMode ? 'dark' : ''}>
   <!-- Header -->
@@ -156,33 +147,27 @@
 
   <div class="output">
     {#if searchState === 'loading'}
-      <div class="loading">
-        Loading...
-      </div>
+      <div class="loading">Loading...</div>
     {:else if searchState === 'no-results'}
-      <div class="not-found">
-        Not Found
-      </div>
+      <div class="not-found">Not Found</div>
     {:else if searchState === 'results'}
       {#each suggestions as s (s.id)}
         <div class="card" in:fly={{ y: 20, duration: 200 }}>
           <div class="card-header">
             <h2>{s.kanji || s.reading}</h2>
             {#if s.pos}<span class="pos">{s.pos}</span>{/if}
-            <button class="speak-btn" on:click={() => speakWord(s)}><img src="\volume-up.png" height="20" style="margin-top:5px" alt=""></button>
+            <button class="speak-btn" on:click={() => speakWord(s)}>
+              <img src="/volume-up.png" height="20" style="margin-top:5px" alt="Speak"/>
+            </button>
           </div>
-          {#if s.reading}<p class="reading">{s.reading} ({s.romaji})</p>{/if}
+          {#if s.reading}
+            <p class="reading">{s.reading} ({s.romaji})</p>
+          {/if}
           <p class="meanings">{s.meanings}</p>
         </div>
       {/each}
-
     {/if}
   </div>
-
-
-
-
-
 
   <!-- Keyboard -->
   {#if isUsingKeyboard}
