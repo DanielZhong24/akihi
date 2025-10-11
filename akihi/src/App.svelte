@@ -114,10 +114,19 @@
   // --------------------------
   function speakWord(word) {
     if (!window.speechSynthesis) return;
-    const utterance = new SpeechSynthesisUtterance(word.reading || word.kanji);
+
+    const text = word.reading 
+                || (Array.isArray(word.kanji) ? word.kanji.map(k => k.text).join(' ') : word.kanji)
+                || '';
+    if (!text) return;
+
+    const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'ja-JP';
-    speechSynthesis.speak(utterance);
+
+    // Some mobile browsers need a small timeout to initialize
+    setTimeout(() => speechSynthesis.speak(utterance), 0);
   }
+
 </script>
 
 
@@ -160,7 +169,7 @@
           <div class="card-header">
             <h2>{s.kanji || s.reading}</h2>
             {#if s.pos}<span class="pos">{s.pos}</span>{/if}
-            <button class="speak-btn" on:click={() => speakWord(s)}><img src="\volume-up.png" height="20" style="margin-top:5px"></button>
+            <button class="speak-btn" on:click={() => speakWord(s)}><img src="\volume-up.png" height="20" style="margin-top:5px" alt=""></button>
           </div>
           {#if s.reading}<p class="reading">{s.reading} ({s.romaji})</p>{/if}
           <p class="meanings">{s.meanings}</p>
