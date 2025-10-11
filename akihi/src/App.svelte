@@ -4,7 +4,7 @@
   import HiraganaKeyboard from '$/keyboard/HiraganaKeyboard';
   import { fly } from 'svelte/transition';
 
-
+  import * as wanakana from 'wanakana';
   let suggestions = [];
   let inputValue = '';
   let inputRef;
@@ -39,6 +39,7 @@
           id: word.id,
           kanji: word.kanji.join(', ') || '',
           reading: word.kana.join(', ') || '',
+          romaji: word.kana.map(k => wanakana.toRomaji(k)).join(', '), // convert kana to romaji
           meanings: word.definitions.join(', '),
           pos: word.pos ? word.pos.join(', ') : ''
         }));
@@ -51,22 +52,17 @@
     }
   }
 
-  // Live input handler with debounce
   function handleInputChange(e) {
     inputValue = e.target.value;
-
     clearTimeout(typingTimeout);
-
     if (!inputValue.trim()) {
       suggestions = [];
       searchState = 'idle';
       return;
     }
-
     typingTimeout = setTimeout(() => searchWords(), 300);
   }
 
-  // Handle virtual keyboard input
   function handleKeyPress(key) {
     if (key.code === 'Enter') {
       clearTimeout(typingTimeout);
@@ -76,7 +72,6 @@
     if (key.code === 'Backspace') {
       const start = inputRef.selectionStart;
       const end = inputRef.selectionEnd;
-
       if (start !== end) {
         inputValue = inputValue.slice(0, start) + inputValue.slice(end);
         setTimeout(() => inputRef.setSelectionRange(start, start), 0);
@@ -90,7 +85,6 @@
       inputValue += key.label;
     }
 
-    // trigger live search
     clearTimeout(typingTimeout);
     typingTimeout = setTimeout(() => searchWords(), 300);
   }
@@ -114,7 +108,18 @@
   function toggleTheme() {
     darkMode = !darkMode;
   }
+
+  // --------------------------
+  // Speak the word using Web Speech API
+  // --------------------------
+  function speakWord(word) {
+    if (!window.speechSynthesis) return;
+    const utterance = new SpeechSynthesisUtterance(word.reading || word.kanji);
+    utterance.lang = 'ja-JP';
+    speechSynthesis.speak(utterance);
+  }
 </script>
+
 
 <main class={darkMode ? 'dark' : ''}>
   <!-- Header -->
@@ -155,11 +160,13 @@
           <div class="card-header">
             <h2>{s.kanji || s.reading}</h2>
             {#if s.pos}<span class="pos">{s.pos}</span>{/if}
+            <button class="speak-btn" on:click={() => speakWord(s)}><img src="\volume-up.png" height="20" style="margin-top:5px"></button>
           </div>
-          {#if s.reading}<p class="reading">{s.reading}</p>{/if}
+          {#if s.reading}<p class="reading">{s.reading} ({s.romaji})</p>{/if}
           <p class="meanings">{s.meanings}</p>
         </div>
       {/each}
+
     {/if}
   </div>
 
@@ -375,4 +382,19 @@ input {
   .card { padding: 0.8rem 1rem; }
   .output { gap: 0.8rem; }
 }
+
+.speak-btn {
+  margin-left: 0.5rem;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 0.5rem;
+  padding: 0.2rem 0.5rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+.speak-btn:hover {
+  background: #2563eb;
+}
+
 </style>

@@ -1,13 +1,16 @@
 // index.js
 import polka from 'polka';
 import { LRUCache } from 'lru-cache';
+import Fuse from 'fuse.js';
 import { setup, readingBeginning, kanjiBeginning } from 'jmdict-simplified-node';
 
 const PORT = process.env.PORT || 3000;
 const ALLOWED_ORIGIN = (process.env.ALLOWED_ORIGIN || '').replace(/\/$/, '');
 const app = polka();
 
+// --------------------------
 // Initialize JMDict
+// --------------------------
 const jmdictPromise = setup(
   'my-jmdict-db',
   './jmdict-eng-3.6.1.json',
@@ -22,14 +25,14 @@ const cacheEnglish = new LRUCache({ max: 500 });
 const cacheJapanese = new LRUCache({ max: 500 });
 
 // --------------------------
-// Helper: Format Word for Card
+// Format Word for Card with score
 // --------------------------
-function formatWordForCard(word) {
+function formatWordForCard(word, score) {
   const kanji = word.kanji?.map(k => k.text).filter(Boolean) || [];
   const kana = word.kana?.map(k => k.text).filter(Boolean) || [];
   const definitions = word.sense?.flatMap(s => s.gloss?.map(g => g.text) || []) || [];
   const pos = word.sense ? [...new Set(word.sense.flatMap(s => s.partOfSpeech || []))] : [];
-  return { id: word.id, kanji, kana, definitions, pos };
+  return { id: word.id, kanji, kana, definitions, pos, score };
 }
 
 // --------------------------
@@ -44,59 +47,7 @@ async function buildEnglishIndex() {
 }
 
 // --------------------------
-// Sense-weighted English Search
-// --------------------------
-function searchEnglish(words, query, topN = 3) {
-  if (!query) return [];
-
-  const normalizedQuery = query.trim().toLowerCase();
-  const queryWords = normalizedQuery.split(/\s+/);
-
-  const scored = words
-    .map(word => {
-      const glosses = word.sense.flatMap(s =>
-        s.gloss?.map(g => g.text.toLowerCase().trim()) || []
-      );
-
-      let maxScore = 0;
-
-      for (let i = 0; i < glosses.length; i++) {
-        const gloss = glosses[i];
-        const glossWords = gloss.split(/\s+/);
-
-        // Weight by position (earlier gloss = more common)
-        const weight = (glosses.length - i) / glosses.length;
-
-        const exactMatch = queryWords.every(qw => glossWords.includes(qw));
-        if (exactMatch) maxScore = Math.max(maxScore, 3 + weight);
-
-        const startsWithMatch = queryWords.every(qw =>
-          glossWords.some(w => w.startsWith(qw))
-        );
-        if (startsWithMatch) maxScore = Math.max(maxScore, 2 + weight);
-      }
-
-      return { word, score: maxScore };
-    })
-    .filter(entry => entry.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .map(entry => entry.word);
-
-  const seen = new Set();
-  const results = [];
-  for (const w of scored) {
-    if (!seen.has(w.id)) {
-      results.push(w);
-      seen.add(w.id);
-    }
-    if (results.length >= topN) break;
-  }
-
-  return results;
-}
-
-// --------------------------
-// Japanese Priority Boost
+// Japanese Priority Tags
 // --------------------------
 function getJapanesePriority(word) {
   let score = 0;
@@ -108,36 +59,111 @@ function getJapanesePriority(word) {
 }
 
 // --------------------------
-// Ranked Japanese Search
+// English Search: weighted & fuzzy
 // --------------------------
-function rankJapaneseEntries(words, query, topN = 3) {
-  const normalizedQuery = query.trim().toLowerCase();
+function searchEnglish(words, query, topN = 5) {
+  if (!query) return [];
 
-  const scored = words
+  const normalizedQuery = query.trim().toLowerCase();
+  const queryWords = normalizedQuery.split(/\s+/);
+
+  let scored = words
     .map(word => {
-      const texts = [
-        ...(word.kanji?.map(k => k.text) || []),
-        ...(word.kana?.map(k => k.text) || [])
-      ].map(t => t.toLowerCase().trim());
+      const glosses = word.sense.flatMap(s =>
+        s.gloss?.map(g => g.text.toLowerCase().trim()) || []
+      );
+
+      let maxScore = 0;
+
+      for (let i = 0; i < glosses.length; i++) {
+        const gloss = glosses[i];
+        const glossWords = gloss.split(/\s+/);
+        const weight = (glosses.length - i) / glosses.length;
+
+        const exactMatch = queryWords.every(qw => glossWords.includes(qw));
+        if (exactMatch) maxScore = Math.max(maxScore, 3 + weight);
+
+        const startsWithMatch = queryWords.every(qw =>
+          glossWords.some(w => w.startsWith(qw))
+        );
+        if (startsWithMatch) maxScore = Math.max(maxScore, 2 + weight);
+
+        const containsMatch = queryWords.every(qw =>
+          glossWords.some(w => w.includes(qw))
+        );
+        if (containsMatch) maxScore = Math.max(maxScore, 1 + weight);
+      }
+
+      return { word, score: maxScore };
+    })
+    .filter(e => e.score > 0)
+    .sort((a, b) => b.score - a.score);
+
+  // Fallback fuzzy search if not enough results
+  if (scored.length < topN) {
+    const fuse = new Fuse(words, { keys: ['sense.gloss.text'], includeScore: true, threshold: 0.4 });
+    const fuzzyResults = fuse.search(normalizedQuery).map(r => ({ word: r.item, score: 1 }));
+    for (const r of fuzzyResults) {
+      if (!scored.find(s => s.word.id === r.word.id)) scored.push(r);
+    }
+  }
+
+  // Deduplicate and limit topN
+  const seen = new Set();
+  const results = [];
+  for (const { word, score } of scored) {
+    if (!seen.has(word.id)) {
+      results.push({ word, score });
+      seen.add(word.id);
+    }
+    if (results.length >= topN) break;
+  }
+
+  return results;
+}
+
+// --------------------------
+// Japanese Search: kanji-first, sense & pri aware
+// --------------------------
+function rankJapaneseEntries(words, query, topN = 5) {
+  const normalizedQuery = query.trim();
+
+  let scored = words
+    .map(word => {
+      const kanjiTexts = (word.kanji?.map(k => k.text) || []).map(t => t.trim());
+      const kanaTexts = (word.kana?.map(k => k.text) || []).map(t => t.trim());
 
       let score = 0;
-      if (texts.includes(normalizedQuery)) score = 3;
-      else if (texts.some(t => t.startsWith(normalizedQuery))) score = 2;
+
+      if (kanjiTexts.includes(normalizedQuery)) score = 5;
+      else if (kanaTexts.includes(normalizedQuery)) score = 4;
+      else if (kanjiTexts.some(t => t.startsWith(normalizedQuery))) score = 3;
+      else if (kanaTexts.some(t => t.startsWith(normalizedQuery))) score = 2;
+      else if (kanjiTexts.concat(kanaTexts).some(t => t.includes(normalizedQuery))) score = 1;
 
       score += getJapanesePriority(word);
 
       return { word, score };
     })
     .filter(e => e.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .map(e => e.word);
+    .sort((a, b) => b.score - a.score);
 
+  // Fallback fuzzy search if needed
+  if (scored.length < topN) {
+    const fuse = new Fuse(words, { keys: ['kanji.text', 'kana.text'], threshold: 0.3 });
+    const fuzzyResults = fuse.search(normalizedQuery).map(r => ({ word: r.item, score: 1 }));
+    for (const r of fuzzyResults) {
+      if (!scored.find(s => s.word.id === r.word.id)) scored.push(r);
+    }
+  }
+
+  // Deduplicate and limit topN
   const seen = new Set();
   const results = [];
-  for (const w of scored) {
-    if (!seen.has(w.id)) {
-      results.push(w);
-      seen.add(w.id);
+  for (const { word, score } of scored) {
+    if (!seen.has(word.id)) {
+      results.push({ word, score });
+      seen.add(word.id);
     }
     if (results.length >= topN) break;
   }
@@ -153,9 +179,7 @@ app.use((req, res, next) => {
   const allowThisOrigin =
     !ALLOWED_ORIGIN || origin === ALLOWED_ORIGIN || origin === 'http://localhost:5173';
 
-  if (allowThisOrigin) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-  }
+  if (allowThisOrigin) res.setHeader('Access-Control-Allow-Origin', origin);
 
   res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -175,7 +199,7 @@ app.use((req, res, next) => {
 // --------------------------
 app.get('/api/search', async (req, res) => {
   const query = (req.query.q || '').trim();
-  const TOP_N = 3;
+  const TOP_N = 5;
   res.setHeader('Content-Type', 'application/json');
 
   if (!query) return res.end(JSON.stringify({ message: [] }));
@@ -197,7 +221,6 @@ app.get('/api/search', async (req, res) => {
         results = rankJapaneseEntries(results, query, TOP_N);
         cacheJapanese.set(query, results);
       }
-
     } else {
       if (cacheEnglish.has(query)) {
         results = cacheEnglish.get(query);
@@ -208,9 +231,9 @@ app.get('/api/search', async (req, res) => {
       }
     }
 
-    const cards = results.map(formatWordForCard);
+    // Include score in response
+    const cards = results.map(({ word, score }) => formatWordForCard(word, score));
     res.end(JSON.stringify({ message: cards }));
-
   } catch (err) {
     res.statusCode = 500;
     res.end(JSON.stringify({ error: err.message }));
