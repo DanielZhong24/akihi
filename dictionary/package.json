@@ -13,6 +13,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "fuse.js": "^7.1.0",
     "jmdict-simplified-node": "^1.1.2",
     "lru-cache": "^11.2.2",
     "polka": "^0.5.2"
