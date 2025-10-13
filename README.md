@@ -2,6 +2,9 @@
 
 [Akihi](https://akihi.vercel.app/) is a lightweight Japanese–English dictionary web app inspired by [Jisho.org](https://jisho.org).  
 It uses [JMdict](https://www.edrdg.org/jmdict/j_jmdict.html), an open-source lexical database, and supports fast lookups for both Japanese and English words.
+<img width="1919" height="941" alt="Screenshot 2025-10-12 234912" src="https://github.com/user-attachments/assets/b75063e9-4c40-4332-a5b8-b36c1dec2ea9"  width="400"/>
+
+
 
 ## Features
 
