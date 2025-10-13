@@ -8,15 +8,6 @@ It uses [JMdict](https://www.edrdg.org/jmdict/j_jmdict.html), an open-source lex
 
 ## Features
 
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/0a8eb75f-4080-4d18-9fef-b8bd1633f339" width="600" style="border-radius:10px; box-shadow:0 4px 8px rgba(0,0,0,0.3);" />
-  <img src="https://github.com/user-attachments/assets/1a522d0a-f9b0-46a2-9ceb-0da4d743c171" width="600" style="border-radius:10px; box-shadow:0 4px 8px rgba(0,0,0,0.3);" />
-</p>
-
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/74abdbc1-9c9a-488e-9bfe-52fc44bda3db" width="400" style="border-radius:10px; box-shadow:0 4px 8px rgba(0,0,0,0.3);" />
-</p>
-
 - Instant search for Japanese or English words  
 - Cached search results for faster performance  
 - API-powered backend built with [Polka](https://github.com/lukeed/polka)  
